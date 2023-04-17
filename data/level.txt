@@ -1,0 +1,10 @@
+; name
+Desert
+; objects
+level_objects.txt
+; terrain
+Snow
+; skybox
+Desert Sky
+; fog
+Light Fog
