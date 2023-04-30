@@ -9,9 +9,12 @@
 // This generates a mesh given a heightmap texture.
 // It generates constant vertices and vertex normals.
 
+const int MESHSIZE = 1000;
+
 struct Terrain
 {
     string name;
+    string filename;
 
     int width, height;
     vector<float> buffer = {}; // contains packed vertices and normals
@@ -20,10 +23,10 @@ struct Terrain
 
     unsigned int strips;
     unsigned int triangles_per_strip;
-    float y_scale = 16.0f;
-    float y_shift = 0.0f;
+    float y_scale = 64.0f;
+    float y_shift = 32.0f;
 
-    unsigned int VAO, VBO, EBO;
+    unsigned int VAO, VBO, TBO, EBO;
     unsigned int up_tex, side_tex;
 
     Terrain() = default;
@@ -32,11 +35,17 @@ struct Terrain
             const string &side_tex_filename = DEFAULT_TEXTURE)
     {
         this->name = name;
+        this->filename = filename;
         Load(filename);
 
         up_tex = TextureFromFile(up_tex_filename.c_str(), texture_path);
         side_tex = TextureFromFile(side_tex_filename.c_str(), texture_path);
 
+        GenerateVertices();
+    }
+
+    void GenerateVertices() {
+        indices = {};
         // Generate Indices
         for(int i = 0; i < height - 1; ++i) {           // For each strip
             for(int j = width - 1; j >= 0; --j) {       // For each column (backwards for CCW data)
@@ -45,6 +54,7 @@ struct Terrain
             }
         }
 
+        buffer = {};
         // Generate Vertices and normals
         for(int i = 0; i < height; ++i) {
             for(int j = 0; j < width; ++j) {
@@ -75,7 +85,6 @@ struct Terrain
         BindBuffers();
     }
 
-
     void Draw(const Shader &shader) const {
         mat4 model = mat4(1.0f);
         shader.setMat4("model", model);
@@ -94,7 +103,7 @@ struct Terrain
 
     // Uses Bilinear Interpolation to return the height at a point.
     float HeightAt(float world_x, float world_z) {
-        cout << camera.position << "\n";
+        //cout << camera.position << "\n";
         assert(fabs(world_x) <= height * 0.5f || fabs(world_z) <= width * 0.5f);
 
         // Gets us into raw_data space.
@@ -124,7 +133,7 @@ struct Terrain
         float x2_minus_x = 1 - x_minus_x1;
         float z2_minus_z = 1 - z_minus_z1;
 
-        cout << "x1: " << x1 << " z1: " << z1 << "\n";
+        //cout << "x1: " << x1 << " z1: " << z1 << "\n";
         // Interpolating over x.
         float fxz1 = x2_minus_x * raw_data[x1][z1] + x_minus_x1 * raw_data[x2][z1];
         float fxz2 = x2_minus_x * raw_data[x1][z2] + x_minus_x1 * raw_data[x2][z2];
@@ -145,6 +154,7 @@ struct Terrain
             return;
         }
 
+        raw_data = {};
         for(int i = 0; i < height; ++i) {
             vector<float> row;
             for(int j = 0; j < width; ++j) {

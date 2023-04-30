@@ -53,7 +53,6 @@ void Init(void)
     SetMusicVolume(DEFAULT_MUSIC_VOLUME);
     SetSfxVolume(DEFAULT_SFX_VOLUME);
 
-
     // Manage OpenGL State
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);

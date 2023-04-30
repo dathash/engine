@@ -19,6 +19,7 @@ void RenderContextEditor(RenderContext *context,
         ImGui::SliderFloat("cel high", &(context->cel_threshold_high), -1.0f, 1.0f);
         ImGui::SliderFloat("cel mid", &(context->cel_threshold_mid), -1.0f, 1.0f);
         ImGui::SliderFloat("cel low", &(context->cel_threshold_low), -1.0f, 1.0f);
+        ImGui::Checkbox("draw lines", &(context->draw_lines));
         ImGui::Checkbox("skybox", &(context->skybox));
         ImGui::Checkbox("processing", &(context->processing));
         ImGui::Checkbox("water", &(context->water));
@@ -216,7 +217,7 @@ void HistoryEditor(EditorCommands *editor_commands)
 
 void LevelEditor(Level *level,
                  const vector<Object> &palette,
-                 const vector<Terrain> &terrains,
+                 vector<Terrain> *terrains,
                  const vector<Skybox> &skyboxes,
                  const vector<Fog> &fogs,
                  EditorCommands *editor_commands
@@ -227,7 +228,7 @@ void LevelEditor(Level *level,
         static char level_name[128] = DEFAULT_LEVEL;
         ImGui::InputText("level", level_name, IM_ARRAYSIZE(level_name));
         if(ImGui::Button("Load")) {
-            *level = LoadLevel(level_name, palette, terrains, skyboxes, fogs);
+            *level = LoadLevel(level_name, palette, *terrains, skyboxes, fogs);
             editor_commands->Clear();
         }
         ImGui::SameLine();
@@ -237,16 +238,24 @@ void LevelEditor(Level *level,
 
         if(ImGui::TreeNode("Terrain"))
         {
-            static int terrain_selection = -1;
-            for (int n = 0; n < terrains.size(); n++)
+            static int terrain_selection = 0;
+            for (int n = 0; n < terrains->size(); n++)
             {
                 char buf[32];
-                sprintf(buf, "%s", terrains[n].name.c_str());
+                sprintf(buf, "%s", terrains->at(n).name.c_str());
                 if(ImGui::Selectable(buf, terrain_selection == n)) {
                     terrain_selection = n;
-                    level->terrain = terrains[terrain_selection];
+                    level->terrain = terrains->at(terrain_selection);
                 }
             }
+
+            ImGui::SliderFloat("scale", &level->terrain.y_scale, 16.0f, 256.0f);
+            ImGui::SliderFloat("shift", &level->terrain.y_shift, -64.0f, 256.0f);
+            if(ImGui::Button("update")) {
+                level->terrain.Load(level->terrain.filename);
+                level->terrain.GenerateVertices();
+            }
+
             ImGui::TreePop();
         }
         if(ImGui::TreeNode("Skybox")) {
@@ -277,7 +286,10 @@ void LevelEditor(Level *level,
         }
 
         for(int n = 0; n < level->objects.size(); ++n) {
-            ImGui::Text("%d | %s", n, level->objects[n].name.c_str());
+            char buf[32];
+            sprintf(buf, "%d | %s", n, level->objects[n].name.c_str());
+            if(ImGui::Selectable(buf, GlobalEditorState.selected == n))
+                GlobalEditorState.selected = n;
         }
     }
     ImGui::End();
@@ -295,15 +307,111 @@ void ShadowEditor(Shadow *shadow)
     ImGui::End();
 }
 
+void AudioSettings()
+{
+    ImGui::Begin("Audio");
+    {
+        static float music_volume = DEFAULT_MUSIC_VOLUME;
+        static float sfx_volume = DEFAULT_SFX_VOLUME;
+        if(ImGui::SliderFloat("Music", &music_volume, 0.0f, 1.0f))
+            SetMusicVolume(music_volume);
+
+        if(ImGui::SliderFloat("SFX", &sfx_volume, 0.0f, 1.0f))
+            SetSfxVolume(sfx_volume);
+    }
+    ImGui::End();
+}
+
+void LineEditor(Line *line, Line *smooth)
+{
+    ImGui::Begin("Swordfish");
+    {
+        static int line_selection = 0;
+
+        if(ImGui::BeginListBox("points"))
+        {
+            for (int n = 0; n < line->points.size(); n++)
+            {
+                char buf[32];
+                sprintf(buf, "%d", n);
+                if(ImGui::Selectable(buf, line_selection == n))
+                    line_selection = n;
+            }
+            ImGui::EndListBox();
+        }
+        if(ImGui::Button("Add"))
+            line->points.push_back(line->points.back());
+        if(ImGui::Button("Remove")) {
+            line->points.erase (line->points.begin()+line_selection);
+            line_selection = std::max(0, line_selection - 1);
+        }
+        if(ImGui::SliderFloat3("point", (float *)&(line->points[line_selection]), -100.0, 100.0))
+        {
+            line->BindBuffers();
+        }
+        if(ImGui::Button("Update Spline"))
+        {
+            vector<vec3> splinepoints;
+            spline(splinepoints, line->points, SPLINE_LOD, 1.0);
+            smooth->points = splinepoints;
+            smooth->BindBuffers();
+        }
+
+    }
+    ImGui::End();
+}
+
+void LineEditor2(Line *line, Line *smooth)
+{
+    ImGui::Begin("Hornet");
+    {
+        static int line_selection = 0;
+        if(ImGui::BeginListBox("points_2"))
+        {
+            for (int n = 0; n < line->points.size(); n++)
+            {
+                char buf[32];
+                sprintf(buf, "%d", n);
+                if(ImGui::Selectable(buf, line_selection == n))
+                    line_selection = n;
+            }
+            ImGui::EndListBox();
+        }
+        if(ImGui::Button("Add"))
+            line->points.push_back(line->points.back());
+        if(ImGui::Button("Remove")) {
+            line->points.erase (line->points.begin()+line_selection);
+            line_selection = std::max(0, line_selection - 1);
+        }
+        if(ImGui::SliderFloat3("point", (float *)&(line->points[line_selection]), -100.0, 100.0))
+        {
+            line->BindBuffers();
+        }
+        if(ImGui::Button("Update Spline"))
+        {
+            vector<vec3> splinepoints;
+            spline(splinepoints, line->points, SPLINE_LOD, 1.0);
+            smooth->points = splinepoints;
+            smooth->BindBuffers();
+        }
+
+    }
+    ImGui::End();
+}
+
 void Editor(EditorCommands *editor_commands,
             RenderContext *context,
             const vector<Object> &palette,
-            const vector<Terrain> &terrains,
+            vector<Terrain> *terrains,
             const vector<Skybox> &skyboxes,
             const vector<Fog> &fogs,
             const Shaders &shaders,
             Level *level,
-            Shadow *shadow
+            Shadow *shadow,
+            Line *line,
+            Line *line2,
+            Line *smooth,
+            Line *smooth2
            )
 {
     ImGui_ImplGlfw_NewFrame();
@@ -315,10 +423,14 @@ void Editor(EditorCommands *editor_commands,
         LevelEditor(level, palette, terrains, skyboxes, fogs, editor_commands);
         ObjectEditor(&(level->objects), editor_commands);
         Palette(palette, &(level->objects));
+        LineEditor(line, smooth);
+        LineEditor2(line2, smooth2);
 
         HistoryEditor(editor_commands);
 
         ShadowEditor(shadow);
+
+        AudioSettings();
 
         DebugUI();
 

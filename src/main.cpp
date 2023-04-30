@@ -114,7 +114,9 @@ int main(void)
         .cel_threshold_mid  = 0.3f,
         .cel_threshold_low  = 0.0f,
 
-        .skybox             = false,
+        .draw_lines         = true,
+
+        .skybox             = true,
         .processing         = false,
         .water              = true,
         .shadow             = false,
@@ -136,7 +138,8 @@ int main(void)
         .quad_shader = Shader("Quad", "quad.vs", "quad.fs"),
         .processing_shader = Shader("Processing", "quad.vs", "post.fs"),
         .cube_shader = Shader("Cube", "cube.vs", "cube.fs"),
-        .terrain_shader = Shader("Terrain", "terrain.vs", "terrain.fs"),
+        .heightmap_shader = Shader("heightmap", "heightmap.vs", "heightmap.fs"),
+        .terrain_shader = Shader("terrain", "terrain.vs", "terrain.fs", "terrain.gs"),
         .water_shader = Shader("Water", "water.vs", "water.fs"),
         .depth_shader = Shader("Depth", "depth.vs", "depth.fs"),
         .line_shader = Shader("Line", "line.vs", "line.fs"),
@@ -153,6 +156,7 @@ int main(void)
             Model("fox/fox.fbx"),
             Model("andre/andre.fbx"),
             Model("hornet/FA-18E_SuperHornet.obj"),
+            Model("swordfish-ii/source/SwordFishII.obj"),
         };
 
     vector<Object> palette = 
@@ -164,13 +168,18 @@ int main(void)
             Object("Fox",     &models[4]),
             Object("Andre",   &models[5]),
             Object("Hornet",  &models[6]),
+            Object("Swordfish", &models[7]),
         };
 
     vector<Terrain> terrains =
         {
             Terrain("Dunes", "dunes.png", "dirt.png",  "redgrass.png"),
             Terrain("Snow",  "lake.png", "white.png", "redgrass.png"),
+            Terrain("All Snow",  "lake.png", "white.png", "white.png"),
             Terrain("Lake",  "lake.png",  "grass.png", "dirt.png"),
+            Terrain("Grassy Lake",  "lake.png",  "grass.png", "grass.png"),
+            Terrain("Crevices",  "crevices.png",  "redgrass.png", "dirt.png"),
+            Terrain("Mountain",  "mountain.png",  "redgrass.png", "dirt.png"),
         };
 
     vector<Skybox> skyboxes =
@@ -179,11 +188,14 @@ int main(void)
             Skybox("Night Sky",  "night/"),
             Skybox("Cloudy Sky", "sun/"),
             Skybox("White Sky", "white/"),
+            Skybox("Space", "space/"),
+            Skybox("Space Day", "space_day/"),
         };
 
     vector<Fog> fogs =
         {
-            {"Light Fog", 200, 50, vec3(1.0f, 1.0f, 1.0f)},
+            {"No Fog", 1000, 1000, vec3(1.0f, 1.0f, 1.0f)},
+            {"Light Fog", 400, 100, vec3(1.0f, 1.0f, 1.0f)},
             {"Heavy Fog", 80, 20, vec3(0.5f, 0.5f, 0.5f)},
             {"Standard Fog", 100, 30, vec3(1.0f, 1.0f, 1.0f)},
             {"Black Fog", 100, 30, vec3(0.0f, 0.0f, 0.0f)},
@@ -195,24 +207,48 @@ int main(void)
     Water water = Water(2.0f);
     Shadow shadow = Shadow();
 
+    // Animation
     Line line = {{
-                  vec3(0.0f,   30.0,   2.0f),
-                  vec3(10.0f,  30.0f, -2.0f),
-                  vec3(20.0f,  30.0f,  2.0f),
-                  vec3(30.0f,  30.0f, -2.0f),
-                  vec3(40.0f,  30.0f,  2.0f),
-                  vec3(50.0f,  30.0f, -2.0f),
-                  vec3(60.0f,  30.0f,  2.0f),
-                  vec3(70.0f,  30.0f, -2.0f),
-                  vec3(80.0f,  30.0f,  2.0f),
-                  vec3(90.0f,  30.0f, -2.0f),
-                  vec3(0.0f,   30.0f, -2.0f),
+                  vec3(-5.0f,  30.0f,  0.0f),
+                  vec3(10.0f,  25.0f,  0.0f),
+                  vec3(20.0f,  25.0f,  5.0f),
+                  vec3(30.0f,  35.0f,  0.0f),
+                  vec3(40.0f,  30.0f, -5.0f),
+                  vec3(50.0f,  25.0f,  0.0f),
+                  vec3(60.0f,  30.0f,  0.0f),
+                  vec3(-5.0f,  30.0f,  0.0f),
+                }};
+    Line line2 = {{
+                  vec3(-5.0f,  30.0f,  0.0f),
+                  vec3(10.0f,  25.0f,  0.0f),
+                  vec3(60.0f,  30.0f,  0.0f),
+                  vec3(-5.0f,  30.0f,  0.0f),
+                  vec3(30.0f,  35.0f,  0.0f),
+                  vec3(40.0f,  30.0f, -5.0f),
+                  vec3(20.0f,  25.0f,  5.0f),
+                  vec3(50.0f,  25.0f,  0.0f),
                 }};
 
+    vector<float> roll = {
+                    0.0f,
+                    0.0f,
+                    -90.0f,
+                    -180.0f,
+                    -270.0f,
+                    -360.0f,
+                    0.0f,
+                    0.0f,
+                };
+
     vector<vec3> splinepoints;
-    spline(splinepoints, line.points, 10, 1.0);
+    spline(splinepoints, line.points, SPLINE_LOD, 1.0);
     Line smooth(splinepoints);
 
+    splinepoints = {};
+    spline(splinepoints, line2.points, SPLINE_LOD, 1.0);
+    Line smooth2(splinepoints);
+
+    // Audio
     GlobalMusic.sounds =
     {
         new Sound("bach.mp3", MUSIC),
@@ -246,6 +282,7 @@ int main(void)
         glfwPollEvents();
         processInput(delta_time);
 
+        /*
         if(GlobalMode == GAME)
         {
             float player_height = 4.0f;
@@ -253,26 +290,27 @@ int main(void)
                                  vec2(level.terrain.height * 0.5f - 2, level.terrain.width * 0.5f - 2));
             camera.position.y = level.terrain.HeightAt(camera.position.x, camera.position.z) + player_height;
         }
+        */
 
         // Simulation
         for(Object &object : level.objects)
-            object.Update(delta_time, smooth);
+            object.Update(delta_time, smooth, smooth2, roll);
 
         // Render
-        Render(context, shaders, level, water, shadow, framebuffer, smooth);
+        Render(context, shaders, level, water, shadow, framebuffer, line, line2, smooth, smooth2);
 
         // Editor
         if(GlobalMode == EDITOR) {
             editor_commands.UpdateCommands(&level);
             editor_commands.HandleInput();
             Editor(&editor_commands, &context, palette, 
-                   terrains, skyboxes, fogs, shaders, 
-                   &level, &shadow);
+                   &terrains, skyboxes, fogs, shaders, 
+                   &level, &shadow, &line, &line2, &smooth, &smooth2);
         }
 
         // Present
         glfwSwapBuffers(window);
-        //CheckOpenGLErrors();
+        CheckOpenGLErrors();
     }
 
     for(Sound *sound : GlobalMusic.sounds)

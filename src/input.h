@@ -38,6 +38,8 @@ void processInput(float delta_time)
 
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         camera.speed = SLOW_MOVEMENT_SPEED;
+    else if(glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
+        camera.speed = SUPER_SLOW_MOVEMENT_SPEED;
     else
         camera.speed = DEFAULT_MOVEMENT_SPEED;
 }

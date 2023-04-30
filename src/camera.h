@@ -41,6 +41,16 @@ struct Camera
 
     void ProcessKeyboard(Camera_Movement direction, float deltaTime) {
         float velocity = speed * deltaTime;
+        if(direction == FORWARD)
+            position += front * velocity;
+        if(direction == BACKWARD)
+            position -= front * velocity;
+        if(direction == LEFT)
+            position -= right * velocity;
+        if(direction == RIGHT)
+            position += right * velocity;
+
+                /*
         switch(GlobalMode)
         {
             case EDITOR:
@@ -66,6 +76,7 @@ struct Camera
                     position -= cross(world_up, front) * velocity;    
             } break;
         }
+            */
     }
 
     void ProcessMouseMovement(float xoffset, float yoffset)
@@ -134,7 +145,6 @@ struct Camera
     // Clamps the camera to a specified x, y range.
     void ClampPosition(vec2 low, vec2 high)
     {
-        cout << "XXX: " << low.x << " " << high.x << "\n";
         if(position.x < low.x)
             position.x = low.x;
         if(position.x > high.x)

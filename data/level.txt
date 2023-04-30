@@ -5,6 +5,6 @@ level_objects.txt
 ; terrain
 Snow
 ; skybox
-Desert Sky
+Space Day
 ; fog
 Light Fog

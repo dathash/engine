@@ -19,6 +19,7 @@ struct RenderContext
     float cel_threshold_high;
     float cel_threshold_mid;
     float cel_threshold_low;
+    bool draw_lines;
 
     bool skybox;
 
@@ -83,42 +84,42 @@ void RenderSkybox(const Skybox &skybox,
 }
 
 
-void RenderTerrain(const RenderContext &context,
-                   const Terrain &terrain,
-                   const Shadow &shadow,
-                   const Fog &fog,
-                   const Shader &terrain_shader,
-                   const mat4 &projection,
-                   const mat4 &view,
-                   const vec4 &clip_plane)
+void RenderHeightmap(const RenderContext &context,
+                     const Terrain &terrain,
+                     const Shadow &shadow,
+                     const Fog &fog,
+                     const Shader &heightmap_shader,
+                     const mat4 &projection,
+                     const mat4 &view,
+                     const vec4 &clip_plane)
 {
-    terrain_shader.bind();
+    heightmap_shader.bind();
     {
-        terrain_shader.setMat4("projection", projection);
-        terrain_shader.setMat4("view", view);
+        heightmap_shader.setMat4("projection", projection);
+        heightmap_shader.setMat4("view", view);
 
-        terrain_shader.setVec3("light_direction", context.light_direction);
-        terrain_shader.setFloat("brightness", context.brightness);
-        terrain_shader.setFloat("opacity", context.opacity);
+        heightmap_shader.setVec3("light_direction", context.light_direction);
+        heightmap_shader.setFloat("brightness", context.brightness);
+        heightmap_shader.setFloat("opacity", context.opacity);
 
-        terrain_shader.setFloat("cel_threshold_high", context.cel_threshold_high);
-        terrain_shader.setFloat("cel_threshold_mid", context.cel_threshold_mid);
-        terrain_shader.setFloat("cel_threshold_low", context.cel_threshold_low);
+        heightmap_shader.setFloat("cel_threshold_high", context.cel_threshold_high);
+        heightmap_shader.setFloat("cel_threshold_mid", context.cel_threshold_mid);
+        heightmap_shader.setFloat("cel_threshold_low", context.cel_threshold_low);
 
-        terrain_shader.setFloat("min_fog_distance", fog.min_distance);
-        terrain_shader.setFloat("max_fog_distance", fog.max_distance);
-        terrain_shader.setVec3("fog_color", fog.color);
+        heightmap_shader.setFloat("min_fog_distance", fog.min_distance);
+        heightmap_shader.setFloat("max_fog_distance", fog.max_distance);
+        heightmap_shader.setVec3("fog_color", fog.color);
 
-        terrain_shader.setInt("up_texture", 0);
-        terrain_shader.setInt("side_texture", 1);
-        terrain_shader.setInt("terrain_size", terrain.width);
+        heightmap_shader.setInt("up_texture", 0);
+        heightmap_shader.setInt("side_texture", 1);
+        heightmap_shader.setInt("terrain_size", terrain.width);
 
-        terrain_shader.setVec4("clip_plane", clip_plane);
+        heightmap_shader.setVec4("clip_plane", clip_plane);
 
-        terrain_shader.setMat4("light_projection", shadow.GetProjectionMatrix());
-        terrain_shader.setMat4("light_view", shadow.GetViewMatrix());
+        heightmap_shader.setMat4("light_projection", shadow.GetProjectionMatrix());
+        heightmap_shader.setMat4("light_view", shadow.GetViewMatrix());
 
-        terrain_shader.setInt("shadow_map", 5); // TODO: I'm doing this to avoid the mesh textures... is this necessary? i don't know enough yet...
+        heightmap_shader.setInt("shadow_map", 5); // TODO: I'm doing this to avoid the mesh textures... is this necessary? i don't know enough yet...
         glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, shadow.depth_buffer);
 
@@ -128,9 +129,9 @@ void RenderTerrain(const RenderContext &context,
         glBindTexture(GL_TEXTURE_2D, terrain.side_tex);
 
         glStencilFunc(GL_ALWAYS, 200, -1);
-        terrain.Draw(terrain_shader);
+        terrain.Draw(heightmap_shader);
     }
-    terrain_shader.unbind();
+    heightmap_shader.unbind();
 }
 
 void RenderObjects(const RenderContext &context,
@@ -215,6 +216,7 @@ void RenderShadowFramebufferToScreen(const Shader &quad_shader,
 
 void RenderLine(const Line &line,
                 const Shader &shader,
+                const vec4 &color,
                 const mat4 &projection,
                 const mat4 &view)
 {
@@ -222,6 +224,8 @@ void RenderLine(const Line &line,
     {
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
+
+        shader.setVec4("color", color);
 
         line.Draw(shader);
     }
@@ -260,6 +264,9 @@ void RenderScene(const RenderContext &context,
                  const Shaders &shaders,
                  const Level &level,
                  const Line &line,
+                 const Line &line2,
+                 const Line &smooth,
+                 const Line &smooth2,
                  const Shadow &shadow,
                  const mat4 &projection,
                  const mat4 &view,
@@ -270,15 +277,27 @@ void RenderScene(const RenderContext &context,
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-    RenderTerrain(context, level.terrain, shadow, level.fog,
-                  shaders.terrain_shader,
+    RenderHeightmap(context, level.terrain, shadow, level.fog,
+                    shaders.heightmap_shader,
+                    projection, view, clip_plane);
+    /*
+    RenderTerrain(context, shaders.terrain_shader,
+                  level.terrain,
                   projection, view, clip_plane);
+    */
     RenderObjects(context, level.objects, shadow, level.fog,
                   shaders.list[context.shader_index],
                   projection, view, clip_plane);
     if(context.skybox)
         RenderSkybox(level.skybox, shaders.cube_shader, projection, view);
-    RenderLine(line, shaders.line_shader, projection, view);
+    if(context.draw_lines) {
+        RenderLine(line, shaders.line_shader, vec4(1.0f, 1.0f, 0.0f, 1.0f), projection, view);
+        RenderLine(line2, shaders.line_shader, vec4(1.0f, 1.0f, 0.0f, 1.0f), projection, view);
+    }
+    if(context.draw_lines) {
+        RenderLine(smooth, shaders.line_shader, vec4(1.0f, 0.0f, 1.0f, 1.0f), projection, view);
+        RenderLine(smooth2, shaders.line_shader, vec4(1.0f, 0.0f, 1.0f, 1.0f), projection, view);
+    }
 
     /*
     if(GlobalEditorMode && GlobalEditorState.selected != -1)
@@ -316,7 +335,10 @@ void Render(const RenderContext &context,
             const Water &water,
             const Shadow &shadow,
             const Framebuffer &framebuffer,
-            const Line &line
+            const Line &line,
+            const Line &line2,
+            const Line &smooth,
+            const Line &smooth2
            )
 {
     camera.projection = camera.GetProjectionMatrix();
@@ -327,7 +349,7 @@ void Render(const RenderContext &context,
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        RenderScene(context, shaders, level, line, shadow,
+        RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
                     camera.projection, camera.view,
                     CLIP_NOTHING);
         return;
@@ -340,7 +362,7 @@ void Render(const RenderContext &context,
         glBindFramebuffer(GL_FRAMEBUFFER, water.reflection_buffer.FBO);
         glViewport(0, 0, water.reflection_buffer.width, water.reflection_buffer.height);
         float invert_distance = 2 * (camera.position.y - water.height);
-        RenderScene(context, shaders, level, line, shadow,
+        RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
                     camera.projection, camera.GetInvertedViewMatrix(invert_distance),
                     vec4(0.0f, 1.0f, 0.0f, -water.height)); // Above water
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -348,7 +370,7 @@ void Render(const RenderContext &context,
         // Refraction
         glBindFramebuffer(GL_FRAMEBUFFER, water.refraction_buffer.FBO);
         glViewport(0, 0, water.refraction_buffer.width, water.refraction_buffer.height);
-        RenderScene(context, shaders, level, line, shadow,
+        RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
                     camera.projection, camera.view,
                     vec4(0.0f, -1.0f, 0.0f, water.height)); // Below water
 
@@ -387,7 +409,7 @@ void Render(const RenderContext &context,
     glEnable(GL_DEPTH_TEST); // ? remove
     glViewport(0, 0, framebuffer.width, framebuffer.height);
 
-    RenderScene(context, shaders, level, line, shadow,
+    RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
                 camera.projection, camera.view,
                 CLIP_NOTHING);
     RenderWater(shaders.water_shader, water, camera.projection, camera.view);

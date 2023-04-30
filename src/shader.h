@@ -14,16 +14,21 @@ struct Shader
     void bind() const { glUseProgram(ID); }
     void unbind() const { glUseProgram(0); }
 
-    Shader(const string &name_in, const char* vertex_filename, const char* fragment_filename)
+    Shader(const string &name_in, const char* vertex_filename, const char* fragment_filename, const char* geometry_filename = "")
     {
         name = name_in;
         string raw_vertex_code = ReadBinaryFile(shader_path + vertex_filename);
         string raw_fragment_code = ReadBinaryFile(shader_path + fragment_filename);
+        string raw_geometry_code;
+
+        if(geometry_filename[0] != '\0')
+            raw_geometry_code = ReadBinaryFile(shader_path + geometry_filename);
 
         const char* vShaderCode = raw_vertex_code.c_str();
         const char* fShaderCode = raw_fragment_code.c_str();
+        const char* gShaderCode = raw_geometry_code.c_str();
 
-        unsigned int vertex, fragment;
+        unsigned int vertex, fragment, geometry;
         int success;
         char infoLog[512];
 
@@ -47,9 +52,24 @@ struct Shader
             cout << "Error: Fragment shader compilation failed.\n" << infoLog << "\n";
         }
 
+        if(geometry_filename[0] != '\0')
+        {
+            geometry = glCreateShader(GL_GEOMETRY_SHADER);
+            glShaderSource(geometry, 1, &gShaderCode, NULL);
+            glCompileShader(geometry);
+
+            glGetShaderiv(geometry, GL_COMPILE_STATUS, &success);
+            if(!success) {
+                glGetShaderInfoLog(geometry, 512, NULL, infoLog);
+                cout << "Error: Geometry shader compilation failed.\n" << infoLog << "\n";
+            }
+        }
+
         ID = glCreateProgram();
         glAttachShader(ID, vertex);
         glAttachShader(ID, fragment);
+        if(geometry_filename[0] != '\0')
+            glAttachShader(ID, geometry);
         glLinkProgram(ID);
 
         glGetProgramiv(ID, GL_LINK_STATUS, &success);
@@ -59,6 +79,8 @@ struct Shader
         }
         glDeleteShader(vertex);
         glDeleteShader(fragment);
+        if(geometry_filename[0] != '\0')
+            glDeleteShader(geometry);
     }
 
 
@@ -111,6 +133,7 @@ struct Shaders
     Shader quad_shader;
     Shader processing_shader;
     Shader cube_shader;
+    Shader heightmap_shader;
     Shader terrain_shader;
     Shader water_shader;
     Shader depth_shader;

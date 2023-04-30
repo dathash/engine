@@ -1,4 +1,4 @@
-#version 330 core
+#version 410 core
 
 out vec4 outColor;
 
@@ -35,6 +35,6 @@ void main()
 
     // Apply Color
     outColor = color;
-    if(mx > 0.1f)
-        outColor = outline_color;
+    //if(mx > 0.1f)
+    //    outColor = outline_color;
 }

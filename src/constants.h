@@ -9,6 +9,8 @@
 const float PI = 3.1415f;
 const float EPS = 0.0001f;
 
+const int SPLINE_LOD = 10;
+
 const unsigned int FRAMERATE = 60;
 const float FRAMETIME = 1.0f / (float)FRAMERATE;
 
@@ -38,12 +40,12 @@ const string sfx_path = "../assets/audio/sfx/";
 
 const float DEFAULT_MOVEMENT_SPEED = 50.0f;
 const float SLOW_MOVEMENT_SPEED = 10.0f;
+const float SUPER_SLOW_MOVEMENT_SPEED = 5.0f;
 const float DEFAULT_MOUSE_SENSITIVITY = 0.10f;
 const float LOOK_MODE_SENSITIVITY = 0.20f;
 const float DEFAULT_MOUSE_ZOOM = 45.0f;
 
-const float DEFAULT_MUSIC_VOLUME = 1.0f;
-const float DEFAULT_AMBIENCE_VOLUME = 0.1f;
+const float DEFAULT_MUSIC_VOLUME = 0.0f;
 const float DEFAULT_SFX_VOLUME = 1.0f;
 
 #define CLIP_NOTHING vec4(0.0f, 1.0f, 0.0f, 100000)

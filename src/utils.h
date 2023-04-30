@@ -144,10 +144,6 @@ void CheckOpenGLErrors()
             break;
         case GL_INVALID_OPERATION: printf("INVALID_OPERATION\n");
             break;
-        case GL_STACK_OVERFLOW: printf("STACK_OVERFLOW\n");
-            break;
-        case GL_STACK_UNDERFLOW: printf("STACK_UNDERFLOW\n");
-            break;
         case GL_OUT_OF_MEMORY: printf("OUT_OF_MEMORY\n");
             break;
         case GL_INVALID_FRAMEBUFFER_OPERATION: printf("INVALID_FRAMEBUFFER_OPERATION\n");

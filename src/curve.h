@@ -39,8 +39,7 @@ struct Line
 // TODO: Rewrite this travesty of software engineering.
 //       Put it out of its misery.
 void spline(vector<vec3> &result_path, vector<vec3> &original_path,  int lod, float curly)
-{
-	
+{	
 	if (original_path.size()<3) return;
 	result_path.clear();
 	int n1 = original_path.size() + 1;
