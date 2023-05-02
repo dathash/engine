@@ -6,6 +6,12 @@
 #ifndef LAB471_SHAPE_H_INCLUDED
 #define LAB471_SHAPE_H_INCLUDED
 
+// value_ptr for glm
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+using namespace glm;
+
+
 #include <string>
 #include <vector>
 #include <memory>
@@ -25,14 +31,23 @@ public:
 	void loadMesh(const std::string &meshName, std::string *mtlName = NULL, unsigned char *(loadimage)(char const *, int *, int *, int *, int) = NULL);
 	void init();
 	void resize();
+    void CalculateMinsAndMaxes();
+    void GetNormalized();
+    void GetBoundingVertices();
+    void RecalculateWithNewBoundingBox();
+    void UpdateBoundingVertex(int, vec3);
 	void draw(const std::shared_ptr<Program> prog, bool use_extern_texures) const;
 	unsigned int *textureIDs = NULL;
 
+    float minX, minY, minZ;
+    float maxX, maxY, maxZ;
 
-private:
+    vec3 a, b, c, d, e, f, g, h;
+
 	int obj_count = 0;
 	std::vector<unsigned int> *eleBuf = NULL;
 	std::vector<float> *posBuf = NULL;
+	std::vector<float> *relposBuf = NULL;
 	std::vector<float> *norBuf = NULL;
 	std::vector<float> *texBuf = NULL;
 	unsigned int *materialIDs = NULL;

@@ -105,7 +105,7 @@ struct Object
     int segment = 0;
     void Update(float delta_time, const Line &line, const Line &line2, const vector<float> &roll)
     {
-        if(name == "Swordfish")
+        if(name == "Hornet")
         {
             time += delta_time;
 
@@ -139,7 +139,7 @@ struct Object
             orientation *= slerp(q0, q1, roll_interp_factor - (int)roll_interp_factor);
 
             // Model fix
-            orientation *= angleAxis(radians(0.f), vec3(1.f, 0.f, 0.f));
+            orientation *= angleAxis(radians(90.f), vec3(1.f, 0.f, 0.f));
 
             UpdateMatrix();
 
@@ -151,6 +151,7 @@ struct Object
                 segment = 0;
         }
 
+        /*
         if(name == "Hornet")
         {
             time += delta_time;
@@ -196,6 +197,7 @@ struct Object
             if(segment + 1 == line2.points.size())
                 segment = 0;
         }
+        */
     }
 };
 

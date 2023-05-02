@@ -231,13 +231,17 @@ int main(void)
 
     vector<float> roll = {
                     0.0f,
-                    0.0f,
+                    90.0f,
+                    300.0f,
+                    90.0f,
+                    -270.0f,
+                    00.0f,
                     -90.0f,
                     -180.0f,
                     -270.0f,
                     -360.0f,
-                    0.0f,
-                    0.0f,
+                    -2700.0f,
+                    90.0f,
                 };
 
     vector<vec3> splinepoints;

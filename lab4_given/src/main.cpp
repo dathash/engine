@@ -2,6 +2,11 @@
 CPE/CSC 474 Lab base code Eckhardt/Dahl
 based on CPE/CSC 471 Lab base code Wood/Dunn/Eckhardt
 */
+// value_ptr for glm
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+using namespace std;
+using namespace glm;
 
 #include <iostream>
 #include <glad/glad.h>
@@ -10,13 +15,9 @@ based on CPE/CSC 471 Lab base code Wood/Dunn/Eckhardt
 #include "GLSL.h"
 #include "Program.h"
 #include "WindowManager.h"
+
 #include "Shape.h"
 #include "line.h"
-// value_ptr for glm
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-using namespace std;
-using namespace glm;
 shared_ptr<Shape> shape;
 shared_ptr<Shape> plane;
 
@@ -65,6 +66,7 @@ public:
 };
 
 camera mycam;
+static int GlobalSelectedPoint = 0;
 
 class Application : public EventCallbacks
 {
@@ -99,50 +101,48 @@ public:
 			glfwSetWindowShouldClose(window, GL_TRUE);
 		}
 		
+		if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+		{
+            GlobalSelectedPoint += 1;
+            if(GlobalSelectedPoint > 7)
+                GlobalSelectedPoint = 0;
+		}
+		if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+		{
+            GlobalSelectedPoint -= 1;
+            if(GlobalSelectedPoint < 0)
+                GlobalSelectedPoint = 7;
+		}
+        float offset_inc = 0.1f;
 		if (key == GLFW_KEY_W && action == GLFW_PRESS)
 		{
-			mycam.w = 1;
-		}
-		if (key == GLFW_KEY_W && action == GLFW_RELEASE)
-		{
-			mycam.w = 0;
+            plane->UpdateBoundingVertex(GlobalSelectedPoint, vec3(0, offset_inc, 0));
+            plane->RecalculateWithNewBoundingBox();
 		}
 		if (key == GLFW_KEY_S && action == GLFW_PRESS)
 		{
-			mycam.s = 1;
-		}
-		if (key == GLFW_KEY_S && action == GLFW_RELEASE)
-		{
-			mycam.s = 0;
+            plane->UpdateBoundingVertex(GlobalSelectedPoint, vec3(0, -offset_inc, 0));
+            plane->RecalculateWithNewBoundingBox();
 		}
 		if (key == GLFW_KEY_A && action == GLFW_PRESS)
 		{
-			mycam.a = 1;
-		}
-		if (key == GLFW_KEY_A && action == GLFW_RELEASE)
-		{
-			mycam.a = 0;
+            plane->UpdateBoundingVertex(GlobalSelectedPoint, vec3(-offset_inc, 0, 0));
+            plane->RecalculateWithNewBoundingBox();
 		}
 		if (key == GLFW_KEY_D && action == GLFW_PRESS)
 		{
-			mycam.d = 1;
+            plane->UpdateBoundingVertex(GlobalSelectedPoint, vec3(offset_inc, 0, 0));
+            plane->RecalculateWithNewBoundingBox();
 		}
-		if (key == GLFW_KEY_D && action == GLFW_RELEASE)
+		if (key == GLFW_KEY_Z && action == GLFW_PRESS)
 		{
-			mycam.d = 0;
+            plane->UpdateBoundingVertex(GlobalSelectedPoint, vec3(0, 0, offset_inc));
+            plane->RecalculateWithNewBoundingBox();
 		}
-	
-		
-		if (key == GLFW_KEY_C && action == GLFW_RELEASE)
+		if (key == GLFW_KEY_C && action == GLFW_PRESS)
 		{
-			if (smoothrender.is_active())
-				smoothrender.reset();
-			else
-				{
-				vector<vec3> cardinal;
-				cardinal_curve(cardinal, line, 5, 1.0);
-				smoothrender.re_init_line(cardinal);
-				}
+            plane->UpdateBoundingVertex(GlobalSelectedPoint, vec3(0, 0, -offset_inc));
+            plane->RecalculateWithNewBoundingBox();
 		}
 	}
 
@@ -182,7 +182,6 @@ public:
 	/*Note that any gl calls must always happen after a GL state is initialized */
 	void initGeom(const std::string& resourceDirectory)
 	{
-
 		// Initialize mesh.
 		shape = make_shared<Shape>();
 		shape->loadMesh(resourceDirectory + "/sphere.obj");
@@ -191,7 +190,27 @@ public:
 
 		plane = make_shared<Shape>();
 		plane->loadMesh(resourceDirectory + "/t800.obj");
+
+        plane->CalculateMinsAndMaxes();
+        //printf("x: %f to %f.\ny: %f to %f.\nz: %f to %f.\n", plane->minX, plane->maxX, plane->minY, plane->maxY, plane->minZ, plane->maxZ);
+
 		plane->resize();
+
+        plane->CalculateMinsAndMaxes();
+        //printf("x: %f to %f.\ny: %f to %f.\nz: %f to %f.\n", plane->minX, plane->maxX, plane->minY, plane->maxY, plane->minZ, plane->maxZ);
+
+        plane->GetBoundingVertices();
+
+        plane->GetNormalized();
+        // NOTE: Not that many of them...
+        for (int i = 0; i < plane->obj_count; i++)
+        {
+            for(size_t v = 0; v < plane->relposBuf[i].size() / 3; v++)
+            {
+                printf("%f %f %f\n", plane->relposBuf[i][3 * v + 0], plane->relposBuf[i][3 * v + 1], plane->relposBuf[i][3 * v + 2]);
+            }
+        }
+
 		plane->init();
 
 		//generate the VAO
@@ -434,12 +453,119 @@ public:
 		glEnable(GL_DEPTH_TEST);	
 		psky->unbind();
 
-		// Draw the plane using GLSL.
+        // Draw Sphere
+        pplane->bind();
+        {
+            glUniformMatrix4fv(pplane->getUniform("P"), 1, GL_FALSE, &P[0][0]);
+            glUniformMatrix4fv(pplane->getUniform("V"), 1, GL_FALSE, &V[0][0]);
+            glUniform3fv(pplane->getUniform("campos"), 1, &mycam.pos[0]);
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, Texture2);
+
+            // 0, 0, 0
+            mat4 Trans = glm::translate(glm::mat4(1.0f), plane->a + vec3(0, 0, -3));
+            float scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 0)
+                scale_factor = 0.2f;
+            mat4 Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 0, 0, 1
+            Trans = glm::translate(glm::mat4(1.0f), plane->b + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 1)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 0, 1, 0
+            Trans = glm::translate(glm::mat4(1.0f), plane->c + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 2)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 1, 0, 0
+            Trans = glm::translate(glm::mat4(1.0f), plane->d + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 3)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 0, 1, 1
+            Trans = glm::translate(glm::mat4(1.0f), plane->e + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 4)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 1, 0, 1
+            Trans = glm::translate(glm::mat4(1.0f), plane->f + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 5)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 1, 1, 0
+            Trans = glm::translate(glm::mat4(1.0f), plane->g + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 6)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+
+            // 1, 1, 1
+            Trans = glm::translate(glm::mat4(1.0f), plane->h + vec3(0, 0, -3));
+            scale_factor = 0.1f;
+            if(GlobalSelectedPoint == 7)
+                scale_factor = 0.2f;
+            Scale = glm::scale(glm::mat4(1.0f), glm::vec3(scale_factor, scale_factor, scale_factor));
+            
+            M = Trans*Scale;
+
+            glUniformMatrix4fv(pplane->getUniform("M"), 1, GL_FALSE, &M[0][0]);
+            shape->draw(pplane, false);			//render!!!!!!!
+        }
+        pplane->unbind();
+
+		// Draw the <T-800 MODEL, NOT A PLANE> using GLSL.
 		glm::mat4 Trans = glm::translate(glm::mat4(1.0f), vec3(0,0,-3));
 		glm::mat4 Scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
 		sangle = -3.1415926 / 2.;
 		glm::mat4 RotX = glm::rotate(glm::mat4(1.0f), sangle, vec3(1,0,0));
-		
 		
 		M = Trans*RotX*Scale;
 
@@ -452,7 +578,6 @@ public:
 		glBindTexture(GL_TEXTURE_2D, Texture2);
 		plane->draw(pplane, false);			//render!!!!!!!
 		pplane->unbind();
-
 
 
 	}

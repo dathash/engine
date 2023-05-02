@@ -92,6 +92,92 @@ void Shape::loadMesh(const string &meshName, string *mtlpath, unsigned char *(lo
 	z = 0;
 }
 
+void Shape::CalculateMinsAndMaxes()
+{
+	float scaleX, scaleY, scaleZ;
+	float shiftX, shiftY, shiftZ;
+	float epsilon = 0.001f;
+
+	minX = minY = minZ = 1.1754E+38F;
+	maxX = maxY = maxZ = -1.1754E+38F;
+
+	// Go through all vertices to determine min and max of each dimension
+	for (int i = 0; i < obj_count; i++) {
+		for (size_t v = 0; v < posBuf[i].size() / 3; v++)
+		{
+			if (posBuf[i][3 * v + 0] < minX) minX = posBuf[i][3 * v + 0];
+			if (posBuf[i][3 * v + 0] > maxX) maxX = posBuf[i][3 * v + 0];
+
+			if (posBuf[i][3 * v + 1] < minY) minY = posBuf[i][3 * v + 1];
+			if (posBuf[i][3 * v + 1] > maxY) maxY = posBuf[i][3 * v + 1];
+
+			if (posBuf[i][3 * v + 2] < minZ) minZ = posBuf[i][3 * v + 2];
+			if (posBuf[i][3 * v + 2] > maxZ) maxZ = posBuf[i][3 * v + 2];
+		}
+    }
+}
+
+// Puts a shape's vertices into the range [0, 1].
+void Shape::GetNormalized()
+{
+    relposBuf = new std::vector<float>[obj_count];
+	for (int i = 0; i < obj_count; i++)
+    {
+        for(size_t v = 0; v < posBuf[i].size() / 3; v++)
+        {
+            relposBuf[i].push_back((posBuf[i][3 * v + 0] - minX) / (maxX - minX));
+            relposBuf[i].push_back((posBuf[i][3 * v + 1] - minY) / (maxY - minY));
+            relposBuf[i].push_back((posBuf[i][3 * v + 2] - minZ) / (maxZ - minZ));
+        }
+    }
+}
+
+void Shape::GetBoundingVertices()
+{
+    a = vec3(minX, minY, minZ);
+    b = vec3(maxX, minY, minZ);
+    c = vec3(minX, maxY, minZ);
+    d = vec3(maxX, maxY, minZ);
+    e = vec3(minX, minY, maxZ);
+    f = vec3(maxX, minY, maxZ);
+    g = vec3(minX, maxY, maxZ);
+    h = vec3(maxX, maxY, maxZ);
+}
+
+vec3 lerp(vec3 a, vec3 b, float t) {
+    return a * (1 - t) + b * t;
+}
+
+void Shape::RecalculateWithNewBoundingBox()
+{
+    // I think it's like this:
+    // Get the ratio of the point in three axes.
+    // lerp to get the proper y axes over the z axis.
+    // lerp to get the proper z axis over those y axes.
+
+	for (int i = 0; i < obj_count; i++)
+    {
+		for (size_t v = 0; v < relposBuf[i].size() / 3; v++)
+        {
+            vec3 ae = lerp(a, e, relposBuf[i][3 * v + 2]);
+            vec3 cg = lerp(c, g, relposBuf[i][3 * v + 2]);
+            vec3 bf = lerp(b, f, relposBuf[i][3 * v + 2]);
+            vec3 dh = lerp(d, h, relposBuf[i][3 * v + 2]);
+
+            vec3 aecg = lerp(ae, cg, relposBuf[i][3 * v + 1]);
+            vec3 bfdh = lerp(bf, dh, relposBuf[i][3 * v + 1]);
+
+            vec3 p_prime = lerp(aecg, bfdh, relposBuf[i][3 * v + 0]);
+
+            posBuf[i][3 * v + 0] = p_prime.x;
+            posBuf[i][3 * v + 1] = p_prime.y;
+            posBuf[i][3 * v + 2] = p_prime.z;
+        }
+    }
+
+    init();
+}
+
 void Shape::resize()
 {
 	float minX, minY, minZ;
@@ -157,13 +243,49 @@ void Shape::resize()
 		}
 }
 
+void Shape::UpdateBoundingVertex(int i, vec3 dir)
+{
+    switch (i)
+    {
+        case 0:
+        {
+            a += dir;
+        } break;
+        case 1:
+        {
+            b += dir;
+        } break;
+        case 2:
+        {
+            c += dir;
+        } break;
+        case 3:
+        {
+            d += dir;
+        } break;
+        case 4:
+        {
+            e += dir;
+        } break;
+        case 5:
+        {
+            f += dir;
+        } break;
+        case 6:
+        {
+            g += dir;
+        } break;
+        case 7:
+        {
+            h += dir;
+        } break;
+    }
+}
+
 void Shape::init()
 {
 	for (int i = 0; i < obj_count; i++)
-
 	{
-
-
 		// Initialize the vertex array object
 		glGenVertexArrays(1, &vaoID[i]);
 		glBindVertexArray(vaoID[i]);
