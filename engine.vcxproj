@@ -22,6 +22,7 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{501CAC98-BDC5-488A-B807-8DC2BA1FD96D}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -68,6 +69,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(SolutionDir)\ext\glad\include;$(SolutionDir)\ext\imgui\;$(SolutionDir)\ext\imgui\backends\;$(SolutionDir)\ext\freetype_binaries\freetype-windows-binaries-master\include;$(SolutionDir)\ext\glfw_binaries\glfw-3.3.8.bin.WIN64\include;$(SolutionDir)\ext\glm\include;$(SolutionDir)\ext\;$(SolutionDir)\ext\imguizmo\;$(SolutionDir)\ext\assimp_binaries\assimp-3.1.1-win-binaries\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\ext\glfw_binaries\glfw-3.3.8.bin.WIN64\lib-vc2019;$(SolutionDir)\ext\freetype_binaries\freetype-windows-binaries-master\release static\vs2015-2022\win64;$(SolutionDir)\ext\assimp_binaries\assimp-3.1.1-win-binaries\lib64;$(SolutionDir)\ext\assimp_binaries\assimp-3.1.1-win-binaries\bin64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -98,6 +103,14 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>glfw3.lib;freetype.lib;assimp.lib;assimp.dll;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ext\glad\src\glad.c" />
     <ClCompile Include="ext\imguizmo\ImGuizmo.cpp" />
@@ -109,7 +122,6 @@
     <ClCompile Include="ext\imgui\imgui_tables.cpp" />
     <ClCompile Include="ext\imgui\imgui_widgets.cpp" />
     <ClCompile Include="ext\imgui\misc\cpp\imgui_stdlib.cpp" />
-    <ClCompile Include="ext\imgui\misc\fonts\binary_to_compressed_c.cpp" />
     <ClCompile Include="ext\imgui\misc\freetype\imgui_freetype.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
