@@ -11,6 +11,7 @@ struct RenderContext
     unsigned int shader_index;
     vec3 light_direction;
     vec4 default_color;
+    bool use_default_color;
     vec4 background_color;
 
     float brightness;
@@ -66,6 +67,9 @@ void RenderObjectPreview(const RenderContext &context,
     shader.unbind();
 }
 
+static float rotation_degrees = 0.0f;
+static vec3 rotation_axis = vec3(0, 0, -1);
+static float skybox_darkness = 0.0f;
 void RenderSkybox(const Skybox &skybox,
                   const Shader &cube_shader,
                   const mat4 &projection,
@@ -76,6 +80,12 @@ void RenderSkybox(const Skybox &skybox,
         cube_shader.setMat4("projection", projection);
         // NOTE: Remove translation part of view matrix
         cube_shader.setMat4("view", mat4(mat3(view)));
+
+        mat4 model = mat4(1.0f);
+        model = rotate(model, radians(rotation_degrees), rotation_axis);
+        cube_shader.setMat4("model", model);
+
+        cube_shader.setFloat("skybox_darkness", skybox_darkness);
 
         glStencilFunc(GL_ALWAYS, 201, -1);
         skybox.Draw(cube_shader);
@@ -110,9 +120,10 @@ void RenderHeightmap(const RenderContext &context,
         heightmap_shader.setFloat("max_fog_distance", fog.max_distance);
         heightmap_shader.setVec3("fog_color", fog.color);
 
-        heightmap_shader.setInt("up_texture", 0);
-        heightmap_shader.setInt("side_texture", 1);
+        heightmap_shader.setVec3("up_color", terrain.up_color);
+        heightmap_shader.setVec3("side_color", terrain.side_color);
         heightmap_shader.setInt("terrain_size", terrain.width);
+        heightmap_shader.setFloat("heightmap_color_threshold", terrain.color_threshold);
 
         heightmap_shader.setVec4("clip_plane", clip_plane);
 
@@ -122,11 +133,6 @@ void RenderHeightmap(const RenderContext &context,
         heightmap_shader.setInt("shadow_map", 5); // TODO: I'm doing this to avoid the mesh textures... is this necessary? i don't know enough yet...
         glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, shadow.depth_buffer);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, terrain.up_tex);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, terrain.side_tex);
 
         glStencilFunc(GL_ALWAYS, 200, -1);
         terrain.Draw(heightmap_shader);
@@ -151,6 +157,7 @@ void RenderObjects(const RenderContext &context,
         shader.setVec3("light_direction", context.light_direction);
 
         shader.setVec4("color", context.default_color);
+        shader.setInt("use_default_color", context.use_default_color);
         shader.setFloat("brightness", context.brightness);
 
         shader.setFloat("opacity", context.opacity);
@@ -175,15 +182,29 @@ void RenderObjects(const RenderContext &context,
         for(int i = 0; i < objects.size(); i++) {
             glStencilFunc(GL_ALWAYS, i + 1, -1);
 
-            if(i == GlobalEditorState.selected)
-                shader.setFloat("opacity", sin(5*Time()));
-            else
-                shader.setFloat("opacity", context.opacity);
-
             GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
             glDrawBuffers(2, drawBuffers);
 
+            if(objects[i].animator.current_animation) {
+                auto transforms = objects[i].animator.final_bone_matrices;
+                for (int i = 0; i < transforms.size(); ++i) {
+                    shader.setMat4("bones[" + to_string(i) + "]", transforms[i]);
+                }
+                shader.setInt("animated", 1);
+            }
+            else {
+                shader.setInt("animated", 0);
+            }
+
             objects[i].Draw(shader);
+
+            if(i == GlobalEditorState.selected) {
+                shader.setFloat("highlight_amount", sin(5*Time()));
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                objects[i].Draw(shader);
+            }
+            shader.setFloat("highlight_amount", 0);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
     }
     shader.unbind();
@@ -263,10 +284,6 @@ void RenderFramebufferToScreen(const Shader &quad_shader,
 void RenderScene(const RenderContext &context,
                  const Shaders &shaders,
                  const Level &level,
-                 const Line &line,
-                 const Line &line2,
-                 const Line &smooth,
-                 const Line &smooth2,
                  const Shadow &shadow,
                  const mat4 &projection,
                  const mat4 &view,
@@ -280,30 +297,24 @@ void RenderScene(const RenderContext &context,
     RenderHeightmap(context, level.terrain, shadow, level.fog,
                     shaders.heightmap_shader,
                     projection, view, clip_plane);
-    /*
-    RenderTerrain(context, shaders.terrain_shader,
-                  level.terrain,
-                  projection, view, clip_plane);
-    */
     RenderObjects(context, level.objects, shadow, level.fog,
                   shaders.list[context.shader_index],
                   projection, view, clip_plane);
+
+    if (GlobalMode == EDITOR && GlobalEditorState.selected != -1) {
+        if(context.draw_lines) {
+            RenderLine(level.objects[GlobalEditorState.selected].line, shaders.line_shader, vec4(1.0f, 1.0f, 0.0f, 1.0f), projection, view);
+            RenderLine(level.objects[GlobalEditorState.selected].path, shaders.line_shader, vec4(1.0f, 0.0f, 1.0f, 1.0f), projection, view);
+        }
+    }
+
     if(context.skybox)
         RenderSkybox(level.skybox, shaders.cube_shader, projection, view);
-    if(context.draw_lines) {
-        RenderLine(line, shaders.line_shader, vec4(1.0f, 1.0f, 0.0f, 1.0f), projection, view);
-        RenderLine(line2, shaders.line_shader, vec4(1.0f, 1.0f, 0.0f, 1.0f), projection, view);
-    }
-    if(context.draw_lines) {
-        RenderLine(smooth, shaders.line_shader, vec4(1.0f, 0.0f, 1.0f, 1.0f), projection, view);
-        RenderLine(smooth2, shaders.line_shader, vec4(1.0f, 0.0f, 1.0f, 1.0f), projection, view);
-    }
 
     /*
-    if(GlobalEditorMode && GlobalEditorState.selected != -1)
+    if(GlobalMode == GAME && GlobalEditorState.selected != -1)
         RenderObjectPreview(context, level.objects[GlobalEditorState.selected], shaders.list[context.shader_index]);
     */
-
 }
 
 void RenderWater(const Shader &water_shader,
@@ -334,23 +345,25 @@ void Render(const RenderContext &context,
             const Level &level,
             const Water &water,
             const Shadow &shadow,
-            const Framebuffer &framebuffer,
-            const Line &line,
-            const Line &line2,
-            const Line &smooth,
-            const Line &smooth2
+            const Framebuffer &framebuffer
            )
 {
     camera.projection = camera.GetProjectionMatrix();
     camera.view = camera.GetViewMatrix();
+    mat4 projection = camera.GetProjectionMatrix();
+    mat4 view = camera.GetViewMatrix();
+
+    if(camera.focus_index != -1) {
+        view = lookAt(camera.position, level.objects[camera.focus_index].position, vec3(0, 1, 0));
+    }
 
     // No Framebuffer shenanigans
     if(!context.processing)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
-                    camera.projection, camera.view,
+        RenderScene(context, shaders, level, shadow,
+                    projection, view,
                     CLIP_NOTHING);
         return;
     }
@@ -362,16 +375,17 @@ void Render(const RenderContext &context,
         glBindFramebuffer(GL_FRAMEBUFFER, water.reflection_buffer.FBO);
         glViewport(0, 0, water.reflection_buffer.width, water.reflection_buffer.height);
         float invert_distance = 2 * (camera.position.y - water.height);
-        RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
-                    camera.projection, camera.GetInvertedViewMatrix(invert_distance),
+        mat4 invert_view = camera.GetInvertedViewMatrix(invert_distance);
+        RenderScene(context, shaders, level, shadow,
+                    projection, invert_view,
                     vec4(0.0f, 1.0f, 0.0f, -water.height)); // Above water
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Refraction
         glBindFramebuffer(GL_FRAMEBUFFER, water.refraction_buffer.FBO);
         glViewport(0, 0, water.refraction_buffer.width, water.refraction_buffer.height);
-        RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
-                    camera.projection, camera.view,
+        RenderScene(context, shaders, level, shadow,
+                    projection, view,
                     vec4(0.0f, -1.0f, 0.0f, water.height)); // Below water
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -392,8 +406,20 @@ void Render(const RenderContext &context,
             depth_shader.setMat4("view", shadow.GetViewMatrix());
 
             level.terrain.Draw(depth_shader);
-            for(int i = 0; i < level.objects.size(); ++i)
+            for(int i = 0; i < level.objects.size(); ++i) {
+                if(level.objects[i].animator.current_animation) {
+                    auto transforms = level.objects[i].animator.final_bone_matrices;
+                    for (int i = 0; i < transforms.size(); ++i) {
+                        depth_shader.setMat4("bones[" + to_string(i) + "]", transforms[i]);
+                    }
+                    depth_shader.setInt("animated", 1);
+                }
+                else {
+                    depth_shader.setInt("animated", 0);
+                }
+
                 level.objects[i].Draw(depth_shader);
+            }
         }
         depth_shader.unbind();
 
@@ -409,10 +435,10 @@ void Render(const RenderContext &context,
     glEnable(GL_DEPTH_TEST); // ? remove
     glViewport(0, 0, framebuffer.width, framebuffer.height);
 
-    RenderScene(context, shaders, level, line, line2, smooth, smooth2, shadow,
-                camera.projection, camera.view,
+    RenderScene(context, shaders, level, shadow,
+                projection, view,
                 CLIP_NOTHING);
-    RenderWater(shaders.water_shader, water, camera.projection, camera.view);
+    RenderWater(shaders.water_shader, water, projection, view);
 
     if(context.processing)
         RenderFramebufferToScreen(shaders.processing_shader, framebuffer);

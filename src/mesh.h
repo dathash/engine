@@ -6,6 +6,8 @@
 #ifndef MESH_H
 #define MESH_H
 
+#define MAX_BONE_INFLUENCE 4
+
 struct Vertex
 {
     vec3 Position;
@@ -13,6 +15,10 @@ struct Vertex
     vec2 TexCoords;
     vec3 Tangent;
     vec3 Bitangent;
+	//bone indexes which will influence this vertex
+	int bone_ids[MAX_BONE_INFLUENCE];
+	//weights from each bone
+	float weights[MAX_BONE_INFLUENCE];
 };
 
 struct Texture
@@ -37,6 +43,7 @@ struct Mesh
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
+        setupMesh();
     }
 
     void Draw(const Shader &shader) const {
@@ -74,6 +81,13 @@ struct Mesh
         glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Tangent));
         glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Bitangent));
+		// bone ids
+		glEnableVertexAttribArray(5);
+		glVertexAttribIPointer(5, 4, GL_INT,            sizeof(Vertex), (void*)offsetof(Vertex, bone_ids));
+		// weights
+		glEnableVertexAttribArray(6);
+		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, weights));
+
         glBindVertexArray(0);
     }
 

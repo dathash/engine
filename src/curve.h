@@ -14,7 +14,7 @@ struct Line
     Line(vector<vec3> points_in)
     : points(points_in)
     {
-        assert(points.size() > 1);
+        //assert(points.size() > 1);
         BindBuffers();
     }
 

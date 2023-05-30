@@ -17,6 +17,9 @@ uniform sampler2D texture_opacity1;
 uniform int no_texture;
 
 uniform vec4 color;
+uniform int use_default_color;
+const vec4 highlight_color = vec4(0.0, 0.5, 1.0, 1.0);
+uniform float highlight_amount;
 
 uniform vec3 light_direction;
 uniform float brightness;
@@ -93,6 +96,8 @@ void main()
     vec3 halfway = normalize(light + eye);
 
     vec4 color_in = mix(texture(texture_diffuse1, tex_coords), color, no_texture);
+    color_in = mix(color_in, color, use_default_color);
+    color_in = highlight_amount * highlight_color + (1 - highlight_amount) * color_in;
 
     float shadow = CalculateShadow(light_space_pos);
 

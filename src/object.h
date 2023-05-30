@@ -50,31 +50,51 @@ struct Object
     string  name;
 
     Model * model;
+    bool animated = false;
+    Animator animator;
+    vector<Animation *> animations;
 
     mat4    matrix;
-
     vec3    position;
     quat    orientation;
-
     float   scale_factor;
+
+    bool pathing = false;
+    Line line = {{}};
+    Line path = {{}};
+    float time = 0.0f;
+    float speed = 0.05f;
+    float segment = 0;
 
     Object(string name_in,
            Model *model_in,
-           vec3 position_in = vec3(0.0f, 0.0f, 0.0f),
-           quat orientation_in = quat(0.0f, 0.0f, 0.0f, 1.0f),
-           float scale_in = 1.0f)
+           bool animated_in = false,
+           float scale_in = 1.0f,
+           quat orientation_in = angleAxis(radians(0.0f), vec3(1, 0, 0)),
+           vec3 position_in = vec3(0.0f, 0.0f, 0.0f))
     : name(name_in),
       model(model_in),
+      animated(animated_in),
       position(position_in),
       orientation(orientation_in),
       scale_factor(scale_in)
     {
         UpdateMatrix();
+
+        line = {{
+                      vec3(30.0f,  30.0f,  -120.0f),
+                      vec3(30.0f,  30.0f,  -100.0f),
+                      vec3(30.0f,  30.0f,  -80.0f),
+                    }};
+
+        vector<vec3> splinepoints;
+        spline(splinepoints, line.points, SPLINE_LOD, 1.0);
+        path = Line(splinepoints);
     }
 
     Object() = default;
 
-    size_t ID() const { return hash<string>{}(name); }
+    inline size_t ID() const { return hash<string>{}(name); }
 
     void Draw(const Shader &shader) const
     {
@@ -100,46 +120,42 @@ struct Object
         this->matrix = pos * rot * scl;
     }
 
-    float speed = 0.05f; // frames per second
-    float time = 0.0f;   // of the current segment
-    int segment = 0;
-    void Update(float delta_time, const Line &line, const Line &line2, const vector<float> &roll)
+    void Update(float delta_time)
     {
-        if(name == "Hornet")
+        animator.UpdateAnimation(delta_time);
+
+        if(pathing && path.points.size() > 0)
         {
             time += delta_time;
 
             float interp_factor = time / (FRAMETIME / speed);
 
             // Update position
-            position = mix(line.points[segment], 
-                           line.points[segment+1], 
+            position = mix(path.points[segment], 
+                           path.points[segment+1], 
                            interp_factor);
 
             // Update rotation
-            vec3 z_basis = mix(normalize(line.points[segment+1] - position),
-                           normalize(line.points[segment+2] - position),
-                           interp_factor);
-
+            vec3 z_basis = normalize(path.points[segment+1] - position);
             vec3 x_basis = cross(z_basis, vec3(0, 1, 0));
             vec3 y_basis = cross(z_basis, x_basis);
-
             mat3 basis;
             basis[0] = x_basis;
             basis[1] = y_basis;
             basis[2] = z_basis;
-            orientation = quat(mat4(basis));
+            quat first = quat(mat4(basis));
 
-            int roll_segment = segment / SPLINE_LOD;
-            float roll_interp_factor = (float)(segment + interp_factor) / SPLINE_LOD;
-            //cout << roll_interp_factor << "\n";
+            z_basis = normalize(path.points[segment+2] - position);
+            x_basis = cross(z_basis, vec3(0, 1, 0));
+            y_basis = cross(z_basis, x_basis);
+            basis[0] = x_basis;
+            basis[1] = y_basis;
+            basis[2] = z_basis;
+            quat second = quat(mat4(basis));
 
-            quat q0 = angleAxis(radians(roll[roll_segment]), vec3(0.f, 0.f, 1.f));
-            quat q1 = angleAxis(radians(roll[roll_segment+1]), vec3(0.f, 0.f, 1.f));
-            orientation *= slerp(q0, q1, roll_interp_factor - (int)roll_interp_factor);
-
+            orientation = slerp(first, second, interp_factor);
             // Model fix
-            orientation *= angleAxis(radians(90.f), vec3(1.f, 0.f, 0.f));
+            orientation *= angleAxis(radians(180.f), vec3(0.f, 0.f, 1.f));
 
             UpdateMatrix();
 
@@ -147,57 +163,9 @@ struct Object
             if(!(time > (FRAMETIME / speed))) return;
             time = 0.0f;
             ++segment;
-            if(segment + 1 == line.points.size())
+            if(segment + 1 == path.points.size())
                 segment = 0;
         }
-
-        /*
-        if(name == "Hornet")
-        {
-            time += delta_time;
-
-            float interp_factor = time / (FRAMETIME / speed);
-
-            // Update position
-            position = mix(line2.points[segment], 
-                           line2.points[segment+1], 
-                           interp_factor);
-
-            // Update rotation
-            vec3 z_basis = mix(normalize(line2.points[segment+1] - position),
-                           normalize(line2.points[segment+2] - position),
-                           interp_factor);
-
-            vec3 x_basis = cross(z_basis, vec3(0, 1, 0));
-            vec3 y_basis = cross(z_basis, x_basis);
-
-            mat3 basis;
-            basis[0] = x_basis;
-            basis[1] = y_basis;
-            basis[2] = z_basis;
-            orientation = quat(mat4(basis));
-
-            int roll_segment = segment / SPLINE_LOD;
-            float roll_interp_factor = (float)(segment + interp_factor) / SPLINE_LOD;
-            //cout << roll_interp_factor << "\n";
-
-            quat q0 = angleAxis(radians(roll[roll_segment]), vec3(0.f, 0.f, 1.f));
-            quat q1 = angleAxis(radians(roll[roll_segment+1]), vec3(0.f, 0.f, 1.f));
-            orientation *= slerp(q0, q1, roll_interp_factor - (int)roll_interp_factor);
-
-            // Model fix
-            orientation *= angleAxis(radians(90.f), vec3(1.f, 0.f, 0.f));
-
-            UpdateMatrix();
-
-            // Switch to the next segment
-            if(!(time > (FRAMETIME / speed))) return;
-            time = 0.0f;
-            ++segment;
-            if(segment + 1 == line2.points.size())
-                segment = 0;
-        }
-        */
     }
 };
 

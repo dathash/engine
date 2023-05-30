@@ -11,8 +11,8 @@ struct Shader
     string name;
     unsigned int ID;
 
-    void bind() const { glUseProgram(ID); }
-    void unbind() const { glUseProgram(0); }
+    inline void bind() const { glUseProgram(ID); }
+    inline void unbind() const { glUseProgram(0); }
 
     Shader(const string &name_in, const char* vertex_filename, const char* fragment_filename, const char* geometry_filename = "")
     {
@@ -134,7 +134,6 @@ struct Shaders
     Shader processing_shader;
     Shader cube_shader;
     Shader heightmap_shader;
-    Shader terrain_shader;
     Shader water_shader;
     Shader depth_shader;
     Shader line_shader;

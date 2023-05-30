@@ -3,8 +3,8 @@ Desert
 ; objects
 level_objects.txt
 ; terrain
-Snow
+Lake
 ; skybox
-Space Day
+Cartoon Green
 ; fog
 Light Fog

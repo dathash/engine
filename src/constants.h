@@ -39,8 +39,10 @@ const string sfx_path = "../assets/audio/sfx/";
 #define DEFAULT_TEXTURE "missing.png"
 
 const float DEFAULT_MOVEMENT_SPEED = 50.0f;
-const float SLOW_MOVEMENT_SPEED = 10.0f;
-const float SUPER_SLOW_MOVEMENT_SPEED = 5.0f;
+const float SLOW_MOVEMENT_SPEED = 5.0f;
+
+static float slow_movement_speed = SLOW_MOVEMENT_SPEED;
+
 const float DEFAULT_MOUSE_SENSITIVITY = 0.10f;
 const float LOOK_MODE_SENSITIVITY = 0.20f;
 const float DEFAULT_MOUSE_ZOOM = 45.0f;

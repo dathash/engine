@@ -3,8 +3,8 @@
 // File: Object
 // Date: March 2023
 
-#ifndef LINEAR_H
-#define LINEAR_H
+#ifndef UTILS_H
+#define UTILS_H
 
 mat4 Affine(vec3 pos_in,
             float angleX,

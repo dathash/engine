@@ -11,8 +11,10 @@ void RenderContextEditor(RenderContext *context,
 {
     ImGui::Begin("Render Context");
     {
+        ImGui::SliderFloat("camera speed", &slow_movement_speed, 0.1f, 10.0f);
         ImGui::SliderFloat3("light dir", (float *)&(context->light_direction), -1.0f, 1.0f);
         ImGui::ColorEdit4("color", (float *)&(context->default_color));
+        ImGui::Checkbox("use color", &(context->use_default_color));
         ImGui::ColorEdit4("background color", (float *)&(context->background_color));
         ImGui::SliderFloat("brightness", &(context->brightness), 0.0f, 3.0f);
         ImGui::SliderFloat("opacity", &(context->opacity), 0.0f, 1.0f);
@@ -23,8 +25,12 @@ void RenderContextEditor(RenderContext *context,
         ImGui::Checkbox("skybox", &(context->skybox));
         ImGui::Checkbox("processing", &(context->processing));
         ImGui::Checkbox("water", &(context->water));
-        ImGui::Checkbox("shadow", &(context->shadow));
+        if(ImGui::Button("No Focus")) {
+            camera.focus_index = -1;
+        }
+        //ImGui::Checkbox("shadow", &(context->shadow));
 
+        /*
         if(ImGui::TreeNode("Shaders"))
         {
             for (int n = 0; n < shaders.list.size(); n++)
@@ -36,9 +42,50 @@ void RenderContextEditor(RenderContext *context,
             }
             ImGui::TreePop();
         }
+        */
     }
     ImGui::End();
 }
+
+void LineEditor(Line *line, Line *smooth)
+{
+    ImGui::Begin("Line Editor");
+    {
+        static int line_selection = 0;
+
+        if(ImGui::BeginListBox("points"))
+        {
+            for (int n = 0; n < line->points.size(); n++)
+            {
+                char buf[32];
+                sprintf(buf, "%d", n);
+                if(ImGui::Selectable(buf, line_selection == n))
+                    line_selection = n;
+            }
+            ImGui::EndListBox();
+        }
+        if(ImGui::Button("Add"))
+            line->points.push_back(line->points.back());
+        if(ImGui::Button("Remove")) {
+            line->points.erase (line->points.begin()+line_selection);
+            line_selection = std::max(0, line_selection - 1);
+        }
+        if(ImGui::SliderFloat3("point", (float *)&(line->points[line_selection]), -100.0, 100.0))
+        {
+            line->BindBuffers();
+        }
+        if(ImGui::Button("Update Spline"))
+        {
+            vector<vec3> splinepoints;
+            spline(splinepoints, line->points, SPLINE_LOD, 1.0);
+            smooth->points = splinepoints;
+            smooth->BindBuffers();
+        }
+
+    }
+    ImGui::End();
+}
+
 
 void ObjectEditor(vector<Object> *level_objects,
                   EditorCommands *editor_commands)
@@ -82,6 +129,9 @@ void ObjectEditor(vector<Object> *level_objects,
         ImGui::SameLine();
         if(ImGui::Button("Copy"))
             process_copy_command(level_objects, *selected);
+
+        if(ImGui::Button("Focus"))
+            camera.focus_index = GlobalEditorState.selected;
 
         static ImGuizmo::OPERATION operation = ImGuizmo::TRANSLATE;
         static ImGuizmo::MODE      mode      = ImGuizmo::WORLD;
@@ -160,12 +210,85 @@ void ObjectEditor(vector<Object> *level_objects,
                             1.0f);
             process_move_command(selected, start, end);
         }
+
+        if (selected->animated) {
+            if(ImGui::TreeNode("Animation")) {
+                static int animation_selection = -1;
+
+                if(selected->animator.current_animation) {
+                    float progress = selected->animator.time / selected->animator.current_animation->duration;
+                    char buf[32];
+                    sprintf(buf, "%.01f/%.01f", selected->animator.time, selected->animator.current_animation->duration);
+                    ImGui::ProgressBar(progress, ImVec2(0.f, 0.f), buf);
+                    ImGui::SameLine();
+                    if(ImGui::Button("stop")) {
+                        animation_selection = -1;
+                        selected->animator.current_animation = NULL;
+                    }
+
+                    ImGui::SliderFloat("speed", &selected->animator.speed, 0.1f, 3.0f);
+                }
+                
+                for (int n = 0; n < selected->animations.size(); n++)
+                {
+                    char buf[32];
+                    sprintf(buf, "%d", n);
+                    if(ImGui::Selectable(buf, animation_selection == n)) {
+                        animation_selection = n;
+                        selected->animator.PlayAnimation(selected->animations[n]);
+                    }
+                }
+
+                ImGui::TreePop();
+            }
+        }
+
+        ImGui::Checkbox("pathing", &selected->pathing);
+        ImGui::SameLine();
+        if(ImGui::Button("Reset")) {
+            selected->pathing = false;
+            selected->time = 0.0f;
+            selected->segment = 0;
+        }
+        if(selected->pathing)
+            LineEditor(&selected->line, &selected->path);
+    }
+    ImGui::End();
+}
+
+void Generation(const vector<Object> &palette,
+                vector<Object> *level,
+                const Terrain &terrain)
+{
+    ImGui::Begin("Generation");
+    {
+        int flowers[] = {30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48};
+        int trees[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 19, 20, 21, 22, 23};
+        int floor_cover[] = {25, 28, 29, 39};
+
+        if (ImGui::Button("Flowers")) {
+            for (int index : flowers) {
+                Generate(5, palette[index], level, terrain);
+            }
+        }
+
+        if (ImGui::Button("Trees")) {
+            for (int index : trees) {
+                Generate(5, palette[index], level, terrain);
+            }
+        }
+
+        if (ImGui::Button("Ground Cover")) {
+            for (int index : floor_cover) {
+                Generate(5, palette[index], level, terrain);
+            }
+        }
     }
     ImGui::End();
 }
 
 void Palette(const vector<Object> &palette,
-             vector<Object> *level)
+             vector<Object> *level_objects)
 {
     static int palette_selection = -1;
     ImGui::Begin("Palette");
@@ -173,15 +296,25 @@ void Palette(const vector<Object> &palette,
         if(ImGui::Button("Add"))
         {
             if(palette_selection != -1)
-                level->push_back(Object(palette[palette_selection]));
-                GlobalEditorState.selected = level->size() - 1;
+                level_objects->push_back(Object(palette[palette_selection]));
+                GlobalEditorState.selected = level_objects->size() - 1;
         }
-        for (int n = 0; n < palette.size(); n++)
+
+        if (ImGui::BeginListBox("## 2", ImVec2(-FLT_MIN, 20 * ImGui::GetTextLineHeightWithSpacing())))
         {
-            char buf[32];
-            sprintf(buf, "%s", palette[n].name.c_str());
-            if(ImGui::Selectable(buf, palette_selection == n))
-                palette_selection = n;
+            for (int n = 0; n < palette.size(); n++)
+            {
+                const bool is_selected = (palette_selection == n);
+                char buf[32];
+                sprintf(buf, "%s", palette[n].name.c_str());
+                if(ImGui::Selectable(buf, palette_selection == n))
+                    palette_selection = n;
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndListBox();
         }
     }
     ImGui::End();
@@ -226,7 +359,7 @@ void LevelEditor(Level *level,
     ImGui::Begin("Level Editor");
     {
         static char level_name[128] = DEFAULT_LEVEL;
-        ImGui::InputText("level", level_name, IM_ARRAYSIZE(level_name));
+        //ImGui::InputText("level", level_name, IM_ARRAYSIZE(level_name));
         if(ImGui::Button("Load")) {
             *level = LoadLevel(level_name, palette, *terrains, skyboxes, fogs);
             editor_commands->Clear();
@@ -234,6 +367,23 @@ void LevelEditor(Level *level,
         ImGui::SameLine();
         if(ImGui::Button("Save")) {
             SaveLevel(*level);
+        }
+
+        if (ImGui::BeginListBox("## 1", ImVec2(-FLT_MIN, 10 * ImGui::GetTextLineHeightWithSpacing())))
+        {
+            for (int n = 0; n < level->objects.size(); n++)
+            {
+                const bool is_selected = (GlobalEditorState.selected == n);
+                char buf[32];
+                sprintf(buf, "%d | %s", n, level->objects[n].name.c_str());
+                if(ImGui::Selectable(buf, GlobalEditorState.selected == n))
+                    GlobalEditorState.selected = n;
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndListBox();
         }
 
         if(ImGui::TreeNode("Terrain"))
@@ -256,6 +406,10 @@ void LevelEditor(Level *level,
                 level->terrain.GenerateVertices();
             }
 
+            ImGui::ColorEdit3("Up Color", (float*)&level->terrain.up_color);
+            ImGui::ColorEdit3("Side Color", (float*)&level->terrain.side_color);
+            ImGui::SliderFloat("Color Threshold", &level->terrain.color_threshold, 0.0f, 1.0f);
+
             ImGui::TreePop();
         }
         if(ImGui::TreeNode("Skybox")) {
@@ -269,6 +423,17 @@ void LevelEditor(Level *level,
                     level->skybox = skyboxes[skybox_selection];
                 }
             }
+            if(ImGui::Button("Sunset")) {
+                rotation_axis = vec3(0, 0, -1);
+                rotation_degrees = 0.0f;
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Sunrise")) {
+                rotation_axis = vec3(0, 0, 1);
+                rotation_degrees = -30.0f;
+            }
+            ImGui::SliderFloat("darkness", &skybox_darkness, 0.0f, 1.0f);
+
             ImGui::TreePop();
         }
         if(ImGui::TreeNode("Fog")) {
@@ -282,14 +447,11 @@ void LevelEditor(Level *level,
                     level->fog = fogs[fog_selection];
                 }
             }
-            ImGui::TreePop();
-        }
 
-        for(int n = 0; n < level->objects.size(); ++n) {
-            char buf[32];
-            sprintf(buf, "%d | %s", n, level->objects[n].name.c_str());
-            if(ImGui::Selectable(buf, GlobalEditorState.selected == n))
-                GlobalEditorState.selected = n;
+            ImGui::SliderFloat("min distance", &level->fog.min_distance, 10.0f, 500.0f);
+            ImGui::SliderFloat("max distance", &level->fog.max_distance, 10.0f, 500.0f);
+            ImGui::ColorEdit3("fog color", (float *)&(level->fog.color));
+            ImGui::TreePop();
         }
     }
     ImGui::End();
@@ -322,83 +484,6 @@ void AudioSettings()
     ImGui::End();
 }
 
-void LineEditor(Line *line, Line *smooth)
-{
-    ImGui::Begin("Swordfish");
-    {
-        static int line_selection = 0;
-
-        if(ImGui::BeginListBox("points"))
-        {
-            for (int n = 0; n < line->points.size(); n++)
-            {
-                char buf[32];
-                sprintf(buf, "%d", n);
-                if(ImGui::Selectable(buf, line_selection == n))
-                    line_selection = n;
-            }
-            ImGui::EndListBox();
-        }
-        if(ImGui::Button("Add"))
-            line->points.push_back(line->points.back());
-        if(ImGui::Button("Remove")) {
-            line->points.erase (line->points.begin()+line_selection);
-            line_selection = std::max(0, line_selection - 1);
-        }
-        if(ImGui::SliderFloat3("point", (float *)&(line->points[line_selection]), -100.0, 100.0))
-        {
-            line->BindBuffers();
-        }
-        if(ImGui::Button("Update Spline"))
-        {
-            vector<vec3> splinepoints;
-            spline(splinepoints, line->points, SPLINE_LOD, 1.0);
-            smooth->points = splinepoints;
-            smooth->BindBuffers();
-        }
-
-    }
-    ImGui::End();
-}
-
-void LineEditor2(Line *line, Line *smooth)
-{
-    ImGui::Begin("Hornet");
-    {
-        static int line_selection = 0;
-        if(ImGui::BeginListBox("points_2"))
-        {
-            for (int n = 0; n < line->points.size(); n++)
-            {
-                char buf[32];
-                sprintf(buf, "%d", n);
-                if(ImGui::Selectable(buf, line_selection == n))
-                    line_selection = n;
-            }
-            ImGui::EndListBox();
-        }
-        if(ImGui::Button("Add"))
-            line->points.push_back(line->points.back());
-        if(ImGui::Button("Remove")) {
-            line->points.erase (line->points.begin()+line_selection);
-            line_selection = std::max(0, line_selection - 1);
-        }
-        if(ImGui::SliderFloat3("point", (float *)&(line->points[line_selection]), -100.0, 100.0))
-        {
-            line->BindBuffers();
-        }
-        if(ImGui::Button("Update Spline"))
-        {
-            vector<vec3> splinepoints;
-            spline(splinepoints, line->points, SPLINE_LOD, 1.0);
-            smooth->points = splinepoints;
-            smooth->BindBuffers();
-        }
-
-    }
-    ImGui::End();
-}
-
 void Editor(EditorCommands *editor_commands,
             RenderContext *context,
             const vector<Object> &palette,
@@ -407,11 +492,7 @@ void Editor(EditorCommands *editor_commands,
             const vector<Fog> &fogs,
             const Shaders &shaders,
             Level *level,
-            Shadow *shadow,
-            Line *line,
-            Line *line2,
-            Line *smooth,
-            Line *smooth2
+            Shadow *shadow
            )
 {
     ImGui_ImplGlfw_NewFrame();
@@ -423,8 +504,7 @@ void Editor(EditorCommands *editor_commands,
         LevelEditor(level, palette, terrains, skyboxes, fogs, editor_commands);
         ObjectEditor(&(level->objects), editor_commands);
         Palette(palette, &(level->objects));
-        LineEditor(line, smooth);
-        LineEditor2(line2, smooth2);
+        Generation(palette, &(level->objects), level->terrain);
 
         HistoryEditor(editor_commands);
 

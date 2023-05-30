@@ -11,7 +11,6 @@ struct Input
 };
 static Input input;
 
-
 void processInput(float delta_time)
 {
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -35,11 +34,13 @@ void processInput(float delta_time)
 		camera.ProcessKeyboard(LEFT, delta_time);
 	if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera.ProcessKeyboard(RIGHT, delta_time);
+	if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+		camera.ProcessKeyboard(UP, delta_time);
+	if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+		camera.ProcessKeyboard(DOWN, delta_time);
 
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        camera.speed = SLOW_MOVEMENT_SPEED;
-    else if(glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
-        camera.speed = SUPER_SLOW_MOVEMENT_SPEED;
+        camera.speed = slow_movement_speed;
     else
         camera.speed = DEFAULT_MOVEMENT_SPEED;
 }
@@ -88,10 +89,12 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
                          SCREEN_HEIGHT - GlobalEditorState.mouse_pos.y, 
                          1, 1, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE,
                          &intermediary);
-            if(intermediary > 100)
+            if(intermediary > 100) {
                 GlobalEditorState.selected = -1;
-            else
+            }
+            else {
                 GlobalEditorState.selected = intermediary - 1;
+            }
         }
     }
 
@@ -136,7 +139,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     }
 
-    if(key == GLFW_KEY_E && action == GLFW_PRESS)
+    if(key == GLFW_KEY_R && action == GLFW_PRESS)
     {
         if(GlobalMode == EDITOR) GlobalMode = GAME;
         else if(GlobalMode == GAME) GlobalMode = EDITOR;
@@ -151,7 +154,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     }
 
-    if(key == GLFW_KEY_Q && action == GLFW_PRESS)
+    if(key == GLFW_KEY_R && action == GLFW_PRESS)
     {
         GlobalEditorState.selected = -1;
     }

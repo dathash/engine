@@ -10,7 +10,9 @@ enum Camera_Movement {
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+    UP,
+    DOWN,
 };
 
 struct Camera
@@ -35,6 +37,9 @@ struct Camera
     float zoom        = DEFAULT_MOUSE_ZOOM;
     float speed       = DEFAULT_MOVEMENT_SPEED;
 
+    // For fun
+    int focus_index = -1;
+
     Camera() {
         UpdateBasis();
     }
@@ -49,34 +54,10 @@ struct Camera
             position -= right * velocity;
         if(direction == RIGHT)
             position += right * velocity;
-
-                /*
-        switch(GlobalMode)
-        {
-            case EDITOR:
-            {
-                if(direction == FORWARD)
-                    position += front * velocity;
-                if(direction == BACKWARD)
-                    position -= front * velocity;
-                if(direction == LEFT)
-                    position -= right * velocity;
-                if(direction == RIGHT)
-                    position += right * velocity;
-            } break;
-            case GAME:
-            {
-                if(direction == FORWARD)
-                    position += cross(world_up, right) * velocity;
-                if(direction == BACKWARD)
-                    position -= cross(world_up, right) * velocity;
-                if(direction == LEFT)
-                    position += cross(world_up, front) * velocity;
-                if(direction == RIGHT)
-                    position -= cross(world_up, front) * velocity;    
-            } break;
-        }
-            */
+        if(direction == UP)
+            position += up * velocity;
+        if(direction == DOWN)
+            position -= up * velocity;
     }
 
     void ProcessMouseMovement(float xoffset, float yoffset)

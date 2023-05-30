@@ -3,7 +3,7 @@ SRC = $(wildcard ../src/*.cpp src/*.c) $(wildcard ../ext/imgui/*.cpp ../ext/imgu
 CSRC = ../ext/glad/src/glad.c 
 OBJ = ${SRC:.cpp=.o} ${CSRC:.c=.o}
 
-LDFLAGS = -L. -L../ext/glfw/lib/ -L../ext/freetype/lib/ -L../ext/assimp/lib -lglfw -lfreetype -lassimp
+LDFLAGS = -L. -L../ext/assimp/lib/ -L../ext/glfw/lib/ -L../ext/freetype/lib/ -lglfw -lfreetype -lassimp
 INCFLAGS = -I. -I../ext -I../ext/glad/include -I../ext/glfw/include -I../ext/glm/include -I../ext/freetype/include/freetype2 -I../ext/assimp/include -I../ext/imgui/backends/ -I../ext/imgui/ -I../ext/imguizmo/
 FLAGS = -std=c++20 -Wno-deprecated -glldb -O0 -Wall
 OUT = engine

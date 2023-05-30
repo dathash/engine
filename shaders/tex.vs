@@ -15,7 +15,6 @@ uniform mat4 view;
 uniform mat4 model;
 
 uniform vec4 clip_plane;
-
 uniform mat4 light_projection;
 uniform mat4 light_view;
 

@@ -9,8 +9,8 @@
 void Init(void)
 {
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -43,7 +43,7 @@ void Init(void)
 
     ImGui::StyleColorsLight();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui_ImplOpenGL3_Init("#version 410");
 
     // MINIAUDIO
     assert(ma_engine_init(NULL, &GlobalAudioEngine) == MA_SUCCESS);
@@ -59,6 +59,9 @@ void Init(void)
     glEnable(GL_BLEND);
     glEnable(GL_STENCIL_TEST); 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Line specifics
+    glEnable(GL_LINE_SMOOTH);
 
     // Clipping Planes for water reflection/refraction split
     glEnable(GL_CLIP_DISTANCE0);

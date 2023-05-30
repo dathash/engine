@@ -23,23 +23,27 @@ struct Terrain
 
     unsigned int strips;
     unsigned int triangles_per_strip;
-    float y_scale = 64.0f;
-    float y_shift = 32.0f;
+    float y_scale = 32.0f;
+    float y_shift = 5.0f;
+
+    vec3 up_color;
+    vec3 side_color;
+    float color_threshold = 0.5f;
 
     unsigned int VAO, VBO, TBO, EBO;
-    unsigned int up_tex, side_tex;
 
     Terrain() = default;
     Terrain(const string &name, const string &filename,
-            const string &up_tex_filename = DEFAULT_TEXTURE, 
-            const string &side_tex_filename = DEFAULT_TEXTURE)
+            vec3 up_color = vec3(1.0, 1.0, 1.0),
+            vec3 side_color = vec3(0.0, 0.0, 0.0)
+            )
     {
         this->name = name;
         this->filename = filename;
         Load(filename);
 
-        up_tex = TextureFromFile(up_tex_filename.c_str(), texture_path);
-        side_tex = TextureFromFile(side_tex_filename.c_str(), texture_path);
+        this->up_color = up_color;
+        this->side_color = side_color;
 
         GenerateVertices();
     }
@@ -102,8 +106,7 @@ struct Terrain
     size_t ID() const { return hash<string>{}(name); }
 
     // Uses Bilinear Interpolation to return the height at a point.
-    float HeightAt(float world_x, float world_z) {
-        //cout << camera.position << "\n";
+    float HeightAt(float world_x, float world_z) const {
         assert(fabs(world_x) <= height * 0.5f || fabs(world_z) <= width * 0.5f);
 
         // Gets us into raw_data space.
@@ -133,7 +136,6 @@ struct Terrain
         float x2_minus_x = 1 - x_minus_x1;
         float z2_minus_z = 1 - z_minus_z1;
 
-        //cout << "x1: " << x1 << " z1: " << z1 << "\n";
         // Interpolating over x.
         float fxz1 = x2_minus_x * raw_data[x1][z1] + x_minus_x1 * raw_data[x2][z1];
         float fxz2 = x2_minus_x * raw_data[x1][z2] + x_minus_x1 * raw_data[x2][z2];
@@ -143,7 +145,6 @@ struct Terrain
 
         return fxz;
     }
-
 
     // Load Heightmap from file. Places data in raw_data.
     void Load(string filename) {

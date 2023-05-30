@@ -12,8 +12,9 @@ uniform vec3 light_direction;
 uniform float brightness;
 uniform float opacity;
 
-uniform sampler2D up_texture;
-uniform sampler2D side_texture;
+uniform vec3 up_color;
+uniform vec3 side_color;
+uniform float heightmap_color_threshold;
 uniform int terrain_size;
 
 uniform sampler2D shadow_map;
@@ -88,20 +89,26 @@ void main()
     vec2 tex_coords = vec2(frag_pos.x / terrain_size, frag_pos.z / terrain_size);
     tex_coords *= 200; // Factor for tiling
 
-    vec4 color_in = vec4(0.0f);
-    if(dot(up, normal) > 0.8f)
-        color_in = texture(up_texture, tex_coords);
+    vec3 color_in = vec3(0.0f);
+    if(dot(up, normal) > heightmap_color_threshold)
+        color_in = up_color;
     else
-        color_in = texture(side_texture, tex_coords);
+        color_in = side_color;
+    if(frag_pos.y < 0.0f) {
+        color_in = side_color;
+    }
+
+    float height = frag_pos.y / 10;
+    color_in = mix(side_color, up_color, clamp(height, 0, 1));
 
     float shadow = CalculateShadow(light_space_pos);
 
     // Determine Colors
     float diffuse_amount = Cel(clamp(dot(normal, light), 0.0f, 1.0f));
-    vec3 diffuse = vec3(color_in) * diffuse_amount;
+    vec3 diffuse = color_in * diffuse_amount;
 
     float ambient_amount = 0.1f;
-    vec3 ambient = vec3(color_in) * ambient_amount;
+    vec3 ambient = color_in * ambient_amount;
 
     // Fog
     float fogFactor = (max_fog_distance - length(view_pos)) / (max_fog_distance - min_fog_distance);

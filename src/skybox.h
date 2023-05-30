@@ -57,17 +57,25 @@ unsigned int LoadCubemapTextures(vector<string> faces)
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
-    int width, height, nrChannels;
+    int width, height, nrComponents;
     for(unsigned int i = 0; i < 6; ++i) {
-        unsigned char *data = stbi_load((skybox_path + faces[i]).c_str(), &width, &height, &nrChannels, 0);
+        unsigned char *data = stbi_load((skybox_path + faces[i]).c_str(), &width, &height, &nrComponents, 0);
         if(!data) {
             cout << "Cubemap failed to load at path: " << faces[i] << "\n";
             stbi_image_free(data);
             return 0;
         }
+        GLenum format = GL_RGB;
+        if (nrComponents == 1)
+            format = GL_RED;
+        else if (nrComponents == 3)
+            format = GL_RGB;
+        else if (nrComponents == 4)
+            format = GL_RGBA;
+
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                     0, GL_RGB, width, height, 
-                     0, GL_RGB, GL_UNSIGNED_BYTE, data);
+                     0, format, width, height, 
+                     0, format, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
     }
 
@@ -89,19 +97,19 @@ struct Skybox
     unsigned int textureID;
 
     Skybox() = default;
-    Skybox(const string &name, const string &directory)
+    Skybox(const string &name, const string &directory, bool png = false)
     {
         this->name = name;
 
         BindBuffers();
 
         vector<string> files;
-        files.push_back(directory + "right.jpg");
-        files.push_back(directory + "left.jpg");
-        files.push_back(directory + "top.jpg");
-        files.push_back(directory + "bottom.jpg");
-        files.push_back(directory + "front.jpg");
-        files.push_back(directory + "back.jpg");
+        files.push_back(directory + "right." + (png ? "png" : "jpg"));
+        files.push_back(directory + "left." + (png ? "png" : "jpg"));
+        files.push_back(directory + "top." + (png ? "png" : "jpg"));
+        files.push_back(directory + "bottom." + (png ? "png" : "jpg"));
+        files.push_back(directory + "front." + (png ? "png" : "jpg"));
+        files.push_back(directory + "back." + (png ? "png" : "jpg"));
         this->textureID = LoadCubemapTextures(files);
     }
 
